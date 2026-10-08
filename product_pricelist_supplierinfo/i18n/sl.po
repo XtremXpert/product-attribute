@@ -4,9 +4,9 @@
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: Odoo Server 18.0\n"
+"Project-Id-Version: Odoo Server 19.0\n"
 "Report-Msgid-Bugs-To: \n"
-"PO-Revision-Date: 2026-05-31 03:26+0000\n"
+"PO-Revision-Date: 2026-07-25 06:41+0000\n"
 "Last-Translator: Matjaz Mozetic <matjaz@luxim.si>\n"
 "Language-Team: none\n"
 "Language: sl\n"
@@ -16,24 +16,6 @@ msgstr ""
 "Plural-Forms: nplurals=4; plural=n%100==1 ? 0 : n%100==2 ? 1 : n%100==3 || "
 "n%100==4 ? 2 : 3;\n"
 "X-Generator: Weblate 5.15.2\n"
-
-#. module: product_pricelist_supplierinfo
-#. odoo-python
-#: code:addons/product_pricelist_supplierinfo/models/product_pricelist_item.py:0
-msgid "%(percentage)s %% %(discount_type)s on %(base)s %(extra)s"
-msgstr "%(percentage)s %% %(discount_type)s na %(base)s %(extra)s"
-
-#. module: product_pricelist_supplierinfo
-#. odoo-python
-#: code:addons/product_pricelist_supplierinfo/models/product_pricelist_item.py:0
-msgid "+ %(amount)s extra fee"
-msgstr "+ %(amount)s dodatnih stroškov"
-
-#. module: product_pricelist_supplierinfo
-#. odoo-python
-#: code:addons/product_pricelist_supplierinfo/models/product_pricelist_item.py:0
-msgid "- %(amount)s rebate"
-msgstr "- %(amount)s popusta"
 
 #. module: product_pricelist_supplierinfo
 #: model:ir.model.fields,help:product_pricelist_supplierinfo.field_product_pricelist_item__base
@@ -57,6 +39,22 @@ msgstr "Na osnovi"
 #: model:ir.model.fields,help:product_pricelist_supplierinfo.field_product_pricelist_item__ignore_supplierinfo_margin
 msgid "Based on supplierinfo price without sale margin applied"
 msgstr "Na podlagi cene iz podatkov dobavitelja brez upoštevanja prodajne marže"
+
+#. module: product_pricelist_supplierinfo
+#: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_pricelist_item__display_name
+#: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_product__display_name
+#: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_supplierinfo__display_name
+#: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_template__display_name
+msgid "Display Name"
+msgstr "Prikazani naziv"
+
+#. module: product_pricelist_supplierinfo
+#: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_pricelist_item__id
+#: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_product__id
+#: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_supplierinfo__id
+#: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_template__id
+msgid "ID"
+msgstr "ID"
 
 #. module: product_pricelist_supplierinfo
 #: model:ir.model.fields,help:product_pricelist_supplierinfo.field_product_pricelist_item__no_supplierinfo_discount
@@ -99,7 +97,6 @@ msgid "Pricelist Rule"
 msgstr "Pravilo cenika"
 
 #. module: product_pricelist_supplierinfo
-#: model:ir.model.fields.selection,name:product_pricelist_supplierinfo.selection__product_pricelist_assortment_item__base__supplierinfo
 #: model:ir.model.fields.selection,name:product_pricelist_supplierinfo.selection__product_pricelist_item__base__supplierinfo
 msgid "Prices based on supplier info"
 msgstr "Cene na osnovi podatkov dobavitelja"
@@ -134,9 +131,3 @@ msgstr "Cenik dobavitelja"
 #: model:ir.model.fields,field_description:product_pricelist_supplierinfo.field_product_pricelist_item__filter_supplier_id
 msgid "Supplier filter"
 msgstr "Filter dobavitelja"
-
-#. module: product_pricelist_supplierinfo
-#. odoo-python
-#: code:addons/product_pricelist_supplierinfo/models/product_pricelist_item.py:0
-msgid "supplier's price"
-msgstr "dobaviteljeva cena"

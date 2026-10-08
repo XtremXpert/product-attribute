@@ -5,14 +5,18 @@
 
 from datetime import datetime
 
-from odoo import fields, models
+from odoo import fields, models, tools
 
 
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
     def _get_supplierinfo_pricelist_price(
-        self, rule, date=None, quantity=None, product_id=None
+        self,
+        rule,
+        date=None,
+        quantity=None,
+        product_id=None,
     ):
         """Method for getting the price from supplier info."""
         self.ensure_one()
@@ -53,31 +57,36 @@ class ProductTemplate(models.Model):
                 price = seller.currency_id._convert(
                     price, rule.currency_id, seller.company_id, convert_date
                 )
-            qty_uom_id = self._context.get("uom") or self.uom_id.id
-            price_uom = self.env["uom.uom"].browse([qty_uom_id])
-
-            # We need to convert the price to the uom used on the sale, if the
-            # uom on the seller is a different one that the one used there.
-            if seller and seller.product_uom_id != price_uom:
-                price = seller.product_uom_id._compute_price(price, price_uom)
+            # price_discounted (used when no_supplierinfo_discount=False) already
+            # converts from seller's purchase UoM to the product's sale UoM.
+            # When no_supplierinfo_discount=True the raw seller price is used and
+            # the caller (product.pricelist.item._compute_price) is responsible
+            # for the UoM conversion to ensure the returned price is in the
+            # product's sale UoM as expected by _compute_price_rule.
+            # We have to replicate this logic in this method as pricelist
+            # method are atomic and we can't hack inside.
+            # Verbatim copy of part of product.pricelist._compute_price_rule.
+            price_limit = price
+            price = (price - (price * (rule.price_discount / 100))) or 0.0
+            if rule.price_round:
+                price = tools.float_round(price, precision_rounding=rule.price_round)
+            if rule.price_surcharge:
+                price += rule.price_surcharge
+            if rule.price_min_margin:
+                price = max(price, price_limit + rule.price_min_margin)
+            if rule.price_max_margin:
+                price = min(price, price_limit + rule.price_max_margin)
         return price
 
     def _price_compute(
         self, price_type, uom=None, currency=None, company=False, date=False
     ):
+        """Return dummy not falsy prices when computation is done from supplier
+        info for avoiding error on super method. We will later fill these with
+        correct values.
+        """
         if price_type == "supplierinfo":
-            prices = dict.fromkeys(self.ids, 0.0)
-            rule = self.env["product.pricelist.item"].browse(
-                self.env.context.get("supplierinfo_rule")
-            )
-            for product in self:
-                # Use sudo due to avoid access error to public user in e-commerce
-                prices[product.id] = product.sudo()._get_supplierinfo_pricelist_price(
-                    rule,
-                    date=date or self.env.context.get("date", fields.Date.today()),
-                    quantity=self.env.context.get("supplierinfo_quantity", 1),
-                )
-            return prices
+            return dict.fromkeys(self.ids, 1.0)
         return super()._price_compute(
             price_type, uom=uom, currency=currency, company=company, date=date
         )

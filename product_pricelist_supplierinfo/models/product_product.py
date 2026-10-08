@@ -3,7 +3,7 @@
 # Copyright 2019 Tecnativa - Carlos Dauden
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
-from odoo import fields, models
+from odoo import models
 
 
 class ProductProduct(models.Model):
@@ -20,7 +20,12 @@ class ProductProduct(models.Model):
             sellers = sellers.sorted("min_qty")
         return sellers
 
-    def _get_supplierinfo_pricelist_price(self, rule, date=None, quantity=None):
+    def _get_supplierinfo_pricelist_price(
+        self,
+        rule,
+        date=None,
+        quantity=None,
+    ):
         return self.product_tmpl_id._get_supplierinfo_pricelist_price(
             rule, date=date, quantity=quantity, product_id=self.id
         )
@@ -28,19 +33,12 @@ class ProductProduct(models.Model):
     def _price_compute(
         self, price_type, uom=None, currency=None, company=None, date=False
     ):
+        """Return dummy not falsy prices when computation is done from supplier
+        info for avoiding error on super method. We will later fill these with
+        correct values.
+        """
         if price_type == "supplierinfo":
-            prices = dict.fromkeys(self.ids, 0.0)
-            rule = self.env["product.pricelist.item"].browse(
-                self.env.context.get("supplierinfo_rule")
-            )
-            for product in self:
-                # Use sudo due to avoid access error to public user in e-commerce
-                prices[product.id] = product.sudo()._get_supplierinfo_pricelist_price(
-                    rule,
-                    date=date or self.env.context.get("date", fields.Date.today()),
-                    quantity=self.env.context.get("supplierinfo_quantity", 1),
-                )
-            return prices
+            return dict.fromkeys(self.ids, 1.0)
         return super()._price_compute(
             price_type,
             uom=uom,

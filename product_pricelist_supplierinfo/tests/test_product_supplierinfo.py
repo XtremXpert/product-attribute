@@ -32,6 +32,7 @@ class TestProductSupplierinfo(BaseCommon):
                         {"partner_id": cls.supplier2.id, "min_qty": 1, "price": 10},
                     ),
                 ],
+                "categ_id": cls.env.ref("product.product_category_goods").id,
             }
         )
         cls.product_with_diff_uom = cls.env["product.product"].create(
@@ -44,11 +45,9 @@ class TestProductSupplierinfo(BaseCommon):
                             "partner_id": cls.supplier1.id,
                             "min_qty": 1,
                             "price": 1200,
-                            "product_uom_id": cls.env.ref(
-                                "uom.product_uom_dozen"
-                            ).id,
-                        },
-                    )
+                            "product_uom_id": cls.env.ref("uom.product_uom_dozen").id,
+                        }
+                    ),
                 ],
             }
         )
@@ -67,13 +66,33 @@ class TestProductSupplierinfo(BaseCommon):
                 ],
             }
         )
+        cls.product_attribute_1 = cls.env["product.attribute"].create(
+            {
+                "name": "Material",
+                "sequence": 10,
+            }
+        )
+        cls.product_attribute_value_1 = cls.env["product.attribute.value"].create(
+            {
+                "name": "Steel",
+                "attribute_id": cls.product_attribute_1.id,
+                "sequence": 1,
+            }
+        )
+        cls.product_attribute_value_2 = cls.env["product.attribute.value"].create(
+            {
+                "name": "Aluminium",
+                "attribute_id": cls.product_attribute_1.id,
+                "sequence": 2,
+            }
+        )
 
     def test_pricelist_based_on_product_category(self):
         self.pricelist.item_ids[0].write(
             {
                 "price_discount": 50,
                 "applied_on": "2_product_category",
-                "categ_id": self.product.categ_id.id,
+                "categ_id": self.env.ref("product.product_category_goods").id,
             }
         )
         self.assertAlmostEqual(
@@ -205,23 +224,17 @@ class TestProductSupplierinfo(BaseCommon):
         )
 
     def test_supplierinfo_per_variant(self):
-        attribute = self.env["product.attribute"].create(
-            {
-                "name": "Test Attribute",
-                "value_ids": [
-                    Command.create({"name": "Value 1"}),
-                    Command.create({"name": "Value 2"}),
-                ],
-            }
-        )
         tmpl = self.env["product.template"].create(
             {
                 "name": "Test Product",
                 "attribute_line_ids": [
                     Command.create(
                         {
-                            "attribute_id": attribute.id,
-                            "value_ids": [Command.set(attribute.value_ids.ids)],
+                            "attribute_id": self.product_attribute_1.id,
+                            "value_ids": [
+                                Command.link(self.product_attribute_value_1.id),
+                                Command.link(self.product_attribute_value_2.id),
+                            ],
                         },
                     )
                 ],
@@ -300,19 +313,19 @@ class TestProductSupplierinfo(BaseCommon):
 
         product_seller_price = self.product_with_diff_uom.seller_ids[0].price
         uom_dozen = self.env.ref("uom.product_uom_dozen")
-        product_pricelist_price_dozen = self.pricelist._get_product_price(
-            self.product_with_diff_uom.with_context(uom=uom_dozen.id), 1
-        )
         uom_unit = self.env.ref("uom.product_uom_unit")
+        product_pricelist_price_dozen = self.pricelist._get_product_price(
+            product=self.product_with_diff_uom, uom=uom_dozen, quantity=1
+        )
         product_pricelist_price_unit = self.pricelist._get_product_price(
-            self.product_with_diff_uom.with_context(uom=uom_unit.id), 1
+            product=self.product_with_diff_uom, uom=uom_unit, quantity=12
         )
         # The price with the will be 1200 on the seller (1 Dozen)
         self.assertEqual(product_seller_price, 1200)
-
-        # The price with the will be 1200 plus the increment of the 20% which will
-        # give us a total of 1440 (1 Dozen)
-        self.assertEqual(product_pricelist_price_dozen, 1440)
+        uom_unit = self.env.ref("uom.product_uom_unit")
+        # The price in the SO will always be the one
+        # for the unit of measure of the product
+        self.assertEqual(product_pricelist_price_dozen, 120)
 
         # And the price with the pricelist and the uom of Units (Instead of Dozen)
         # will be 100, plus the 20% the total will be 120 per Unit
@@ -346,6 +359,26 @@ class TestProductSupplierinfo(BaseCommon):
             expected_price[product_template.id],
         )
 
+    def test_pricelist_uom_conversion_ignore_discount(self):
+        """When ignoring the supplier discount the raw price is still
+        returned in the product's sale UoM, not in the seller's purchase UoM."""
+        seller = self.product_with_diff_uom.seller_ids[0]
+        seller.discount = 20
+        self.pricelist.item_ids[0].write(
+            {
+                "applied_on": "0_product_variant",
+                "product_id": self.product_with_diff_uom.id,
+                "price_discount": 0,
+                "no_supplierinfo_discount": True,
+            }
+        )
+        # Seller raw price is 1200 per dozen (discount ignored).
+        # 1200 / 12 = 100 per unit
+        self.assertAlmostEqual(
+            self.pricelist._get_product_price(self.product_with_diff_uom, 1),
+            100.0,
+        )
+
     def test_pricelist_price_no_sellers(self):
         """Test scenario where there are no sellers linked to the product."""
         product_template = self.product.product_tmpl_id
@@ -354,9 +387,3 @@ class TestProductSupplierinfo(BaseCommon):
             self.pricelist.item_ids[0]
         )
         self.assertAlmostEqual(price, 0)
-
-    def test_pricelist_item_label(self):
-        """Test if the pricelist label shows correct information on base price"""
-        self.assertEqual(
-            self.pricelist.item_ids.price, "0 % discount on supplier's price "
-        )

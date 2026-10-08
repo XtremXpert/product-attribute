@@ -4,7 +4,6 @@
 # License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 
 from odoo import fields, models
-from odoo.tools import format_amount
 
 
 class ProductPricelistItem(models.Model):
@@ -33,49 +32,35 @@ class ProductPricelistItem(models.Model):
         help="Based on supplierinfo price without sale margin applied"
     )
 
-    def _compute_price(self, product, quantity, uom, date, currency=None):
-        # We need to pass the rule and quantity to the product to be able to
-        # get the right price from _get_supplierinfo_pricelist_price.
-        product = product.with_context(
-            supplierinfo_rule=self.id, supplierinfo_quantity=quantity
+    def _compute_price(self, product, quantity, uom, date, currency=None, **kwargs):
+        result = super()._compute_price(
+            product, quantity, uom, date, currency, **kwargs
         )
-        result = super()._compute_price(product, quantity, uom, date, currency)
-        return result
-
-    def _compute_price_label(self):
-        pricelist_items_to_update = self.filtered(
-            lambda r: r.compute_price != "fixed" and r.base == "supplierinfo"
-        )
-        for item in pricelist_items_to_update:
-            base_str = self.env._("supplier's price")
-            # Replicate standard label computation with new base string
-            extra_fee_str = ""
-            if item.price_surcharge > 0:
-                extra_fee_str = self.env._(
-                    "+ %(amount)s extra fee",
-                    amount=format_amount(
-                        item.env,
-                        abs(item.price_surcharge),
-                        currency=item.currency_id,
-                    ),
-                )
-            elif item.price_surcharge < 0:
-                extra_fee_str = self.env._(
-                    "- %(amount)s rebate",
-                    amount=format_amount(
-                        item.env,
-                        abs(item.price_surcharge),
-                        currency=item.currency_id,
-                    ),
-                )
-            discount_type, percentage = self._get_displayed_discount(item)
-            item.price = self.env._(
-                "%(percentage)s %% %(discount_type)s on %(base)s %(extra)s",
-                percentage=percentage,
-                discount_type=discount_type,
-                base=base_str,
-                extra=extra_fee_str,
+        context = self.env.context
+        if self.compute_price == "formula" and self.base == "supplierinfo":
+            result = product.sudo()._get_supplierinfo_pricelist_price(
+                self,
+                date=date or context.get("date", fields.Date.today()),
+                quantity=quantity,
             )
-        return super(
-            ProductPricelistItem, self - pricelist_items_to_update
-        )._compute_price_label()
+            # When ignoring the supplier discount, the raw seller price is used
+            # which is expressed in the seller's purchase UoM. Convert it to the
+            # product's sale UoM so that _compute_price_rule receives a
+            # consistent price regardless of the seller's UoM.
+            if result and self.no_supplierinfo_discount:
+                seller = (
+                    product.sudo()
+                    .with_context(override_min_qty=self.no_supplierinfo_min_quantity)
+                    ._select_seller(
+                        partner_id=context.get(
+                            "force_filter_supplier_id", self.sudo().filter_supplier_id
+                        ),
+                        quantity=quantity,
+                        date=date or context.get("date", fields.Date.today()),
+                    )
+                )
+                if seller and seller.product_uom_id != product.uom_id:
+                    result = seller.product_uom_id._compute_price(
+                        result, product.uom_id
+                    )
+        return result
